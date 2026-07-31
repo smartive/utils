@@ -2,8 +2,9 @@
   "compilerOptions": {
     "declaration": true,
     "outDir": "./dist/",
-    "rootDirs": ["./src"],
+    "rootDir": "./src",
     "sourceMap": true,
+    "inlineSources": true,
     "strict": true,
     "noImplicitReturns": true,
     "noImplicitAny": true,
@@ -12,7 +13,8 @@
     "allowJs": true,
     "resolveJsonModule": true,
     "module": "nodenext",
-    "target": "esnext"
+    "target": "es2022",
+    "lib": ["es2022", "esnext.disposable"]
   },
   "include": ["./src/**/*"]
 }

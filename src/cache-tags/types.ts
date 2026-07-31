@@ -46,13 +46,12 @@ export interface CacheTagsProvider {
   queriesReferencingCacheTags(cacheTags: CacheTag[]): Promise<string[]>;
 
   /**
-   * Deletes the specified cache tags.
+   * Deletes the specified cache tags and all query registrations that reference them.
    *
-   * This removes the cache tag keys entirely. When queries are revalidated and
-   * run again, fresh cache tag mappings will be created.
+   * When queries are revalidated and run again, fresh cache tag mappings will be created.
    *
    * @param {CacheTag[]} cacheTags Array of cache tags to delete
-   * @returns Number of keys deleted
+   * @returns Number of (query, tag) registrations removed
    *
    */
   deleteCacheTags(cacheTags: CacheTag[]): Promise<number>;
@@ -61,8 +60,15 @@ export interface CacheTagsProvider {
    * Wipes out all cache tags.
    *
    * ⚠️ **Warning**: This will delete all cache tag data. Use with caution!
+   *
+   * @returns Number of (query, tag) registrations removed (or keys deleted, depending on the backend)
    */
   truncateCacheTags(): Promise<number>;
+
+  /**
+   * Optional cleanup hook for providers that own external resources (e.g. Redis connections).
+   */
+  dispose?(): Promise<void>;
 }
 
 export type CacheTagsProviderErrorHandlingConfig = {
