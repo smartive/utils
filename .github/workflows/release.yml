@@ -22,14 +22,19 @@ jobs:
       - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
         with:
           node-version: 24
+          registry-url: https://registry.npmjs.org
       - run: npm ci
-      - run: npm run build
+      - run: npm run prettier
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test
+      - run: npm run publint
+      - run: npm run pack:check
       - name: semantic release
-        uses: cycjimmy/semantic-release-action@v6
+        uses: cycjimmy/semantic-release-action@b12c8f6015dc215fe37bc154d4ad456dd3833c90 # v6
         with:
           semantic_version: 25
           extra_plugins: |
-            @semantic-release/changelog@6
             conventional-changelog-conventionalcommits@9
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

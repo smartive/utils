@@ -9,8 +9,10 @@ export const getTelLink = (phoneNumber: string): string => {
     throw new Error('Phone number must be a string.');
   }
 
-  // Remove non-digit characters except for '+' which is used for international numbers
-  const cleanedPhoneNumber = phoneNumber.replace(/[^\d+]/g, '');
+  const trimmed = phoneNumber.trim();
+  const hasLeadingPlus = trimmed.startsWith('+');
+  // Preserve only a leading '+'; strip all other non-digit characters.
+  const digits = trimmed.replace(/\D/g, '');
 
-  return `tel:${cleanedPhoneNumber}`;
+  return `tel:${hasLeadingPlus ? `+${digits}` : digits}`;
 };

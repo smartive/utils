@@ -46,10 +46,13 @@ export class NeonCacheTagsProvider extends AbstractErrorHandlingCacheTagsProvide
           return;
         }
 
-        const tags = cacheTags.flatMap((_, i) => [queryId, cacheTags[i]]);
+        const tags = cacheTags.flatMap((tag) => [queryId, tag]);
         const placeholders = cacheTags.map((_, i) => `($${2 * i + 1}, $${2 * i + 2})`).join(',');
 
-        await this.sql.query(`INSERT INTO ${this.table} VALUES ${placeholders} ON CONFLICT DO NOTHING`, tags);
+        await this.sql.query(
+          `INSERT INTO ${this.table} (query_id, cache_tag) VALUES ${placeholders} ON CONFLICT DO NOTHING`,
+          tags,
+        );
       },
       undefined,
     );
@@ -64,12 +67,9 @@ export class NeonCacheTagsProvider extends AbstractErrorHandlingCacheTagsProvide
           return [];
         }
 
-        const placeholders = cacheTags.map((_, i) => `$${i + 1}`).join(',');
-
-        const { rows } = await this.sql.query(
-          `SELECT DISTINCT query_id FROM ${this.table} WHERE cache_tag IN (${placeholders})`,
+        const { rows } = await this.sql.query(`SELECT DISTINCT query_id FROM ${this.table} WHERE cache_tag = ANY($1)`, [
           cacheTags,
-        );
+        ]);
 
         return rows.reduce<string[]>((queryIds, row) => {
           if (typeof row.query_id === 'string') {
@@ -91,10 +91,14 @@ export class NeonCacheTagsProvider extends AbstractErrorHandlingCacheTagsProvide
         if (!cacheTags?.length) {
           return 0;
         }
-        const placeholders = cacheTags.map((_, i) => `$${i + 1}`).join(',');
 
         return (
-          (await this.sql.query(`DELETE FROM ${this.table} WHERE cache_tag IN (${placeholders})`, cacheTags)).rowCount ?? 0
+          (
+            await this.sql.query(
+              `DELETE FROM ${this.table} WHERE query_id IN (SELECT query_id FROM ${this.table} WHERE cache_tag = ANY($1))`,
+              [cacheTags],
+            )
+          ).rowCount ?? 0
         );
       },
       0,

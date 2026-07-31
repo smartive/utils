@@ -22,4 +22,48 @@ jobs:
       - run: npm ci
       - run: npm run prettier
       - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test
+      - run: npm run publint
+      - run: npm run pack:check
+
+  node20-smoke:
+    name: Node 20 smoke import
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
+        with:
+          node-version: 20
+      - run: npm ci
       - run: npm run build
+      - name: Smoke-import entry points
+        run: |
+          node --input-type=module -e "
+          await import('./dist/index.js');
+          await import('./dist/cache-tags/index.js');
+          await import('./dist/cache-tags/header.js');
+          await import('./dist/cache-tags/provider/base.js');
+          await import('./dist/cache-tags/provider/noop.js');
+          await import('./dist/cache-tags/provider/redis.js');
+          await import('./dist/cache-tags/provider/neon.js');
+          console.log('ok');
+          "
+
+  graphql-compat:
+    name: GraphQL ${{ matrix.graphql }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        graphql: ['15.10.1', '16.14.2', '17.0.2']
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm install --no-save graphql@${{ matrix.graphql }}
+      - run: npm run test
