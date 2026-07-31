@@ -1,29 +1,13 @@
 {
-  "name": "@smartive/datocms-utils",
+  "name": "@smartive/utils",
   "version": "1.0.0",
-  "description": "A set of utilities and helpers to work with DatoCMS in a Next.js project.",
+  "description": "A set of general purpose utilities and helpers for web projects.",
   "type": "module",
   "source": "./src/index.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    },
-    "./cache-tags": {
-      "types": "./dist/cache-tags/index.d.ts",
-      "import": "./dist/cache-tags/index.js"
-    },
-    "./cache-tags/redis": {
-      "types": "./dist/cache-tags/provider/redis.d.ts",
-      "import": "./dist/cache-tags/provider/redis.js"
-    },
-    "./cache-tags/neon": {
-      "types": "./dist/cache-tags/provider/neon.d.ts",
-      "import": "./dist/cache-tags/provider/neon.js"
-    },
-    "./cache-tags/noop": {
-      "types": "./dist/cache-tags/provider/noop.d.ts",
-      "import": "./dist/cache-tags/provider/noop.js"
     }
   },
   "files": [
@@ -41,42 +25,23 @@
     "access": "public"
   },
   "keywords": [
-    "datocms"
+    "utils",
+    "helpers"
   ],
   "author": "smartive AG",
   "license": "MIT",
   "repository": {
-    "url": "git+https://github.com/smartive/datocms-utils.git",
+    "url": "git+https://github.com/smartive/utils.git",
     "type": "git"
   },
   "devDependencies": {
-    "@neondatabase/serverless": "1.1.0",
     "@smartive/eslint-config": "7.0.1",
     "@smartive/prettier-config": "3.1.2",
     "@types/node": "24.13.3",
-    "@types/pg": "8.20.0",
     "eslint": "9.39.5",
     "eslint-import-resolver-typescript": "4.4.5",
-    "graphql": "17.0.2",
-    "ioredis": "5.11.1",
     "prettier": "3.9.6",
     "rimraf": "6.1.3",
     "typescript": "5.9.3"
-  },
-  "peerDependencies": {
-    "@neondatabase/serverless": "^1.0.0",
-    "graphql": "^15.0.0 || ^16.0.0 || ^17.0.0",
-    "ioredis": "^5.4.0"
-  },
-  "peerDependenciesMeta": {
-    "@neondatabase/serverless": {
-      "optional": true
-    },
-    "graphql": {
-      "optional": true
-    },
-    "ioredis": {
-      "optional": true
-    }
   }
 }
