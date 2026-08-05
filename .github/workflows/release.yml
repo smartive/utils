@@ -26,11 +26,14 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 24
+          cache: npm
       - run: npm ci
-      - run: npm run prettier
-      - run: npm run lint
-      - run: npm run test
-      - run: npm run build
+      # Deliberately not `npm run verify`: the install-based export smokes and the
+      # Next build smokes need the npm registry, and a registry blip must not fail a
+      # release. PR CI (test.yml) gates those on the same content; keep the required
+      # status checks enabled on main so nothing reaches here unverified. This job
+      # still builds and asserts the published layout offline.
+      - run: npm run verify:release
       - name: semantic release
         uses: cycjimmy/semantic-release-action@b12c8f6015dc215fe37bc154d4ad456dd3833c90 # v6
         with:

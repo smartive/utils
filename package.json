@@ -5,22 +5,53 @@
   "type": "module",
   "source": "./src/index.ts",
   "sideEffects": false,
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/cjs/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/cjs/index.js"
+      },
+      "default": "./dist/esm/index.js"
     },
     "./http": {
-      "types": "./dist/http/index.d.ts",
-      "import": "./dist/http/index.js"
+      "import": {
+        "types": "./dist/esm/http/index.d.ts",
+        "default": "./dist/esm/http/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/http/index.d.ts",
+        "default": "./dist/cjs/http/index.js"
+      },
+      "default": "./dist/esm/http/index.js"
     },
     "./datocms": {
-      "types": "./dist/datocms/index.d.ts",
-      "import": "./dist/datocms/index.js"
+      "import": {
+        "types": "./dist/esm/datocms/index.d.ts",
+        "default": "./dist/esm/datocms/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/datocms/index.d.ts",
+        "default": "./dist/cjs/datocms/index.js"
+      },
+      "default": "./dist/esm/datocms/index.js"
     },
     "./next": {
-      "types": "./dist/next/index.d.ts",
-      "import": "./dist/next/index.js"
+      "import": {
+        "types": "./dist/esm/next/index.d.ts",
+        "default": "./dist/esm/next/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/next/index.d.ts",
+        "default": "./dist/cjs/next/index.js"
+      },
+      "default": "./dist/esm/next/index.js"
     }
   },
   "files": [
@@ -28,13 +59,30 @@
     "src/**/*",
     "!src/**/*.test.ts"
   ],
+  "typesVersions": {
+    "*": {
+      "http": ["./dist/cjs/http/index.d.ts"],
+      "datocms": ["./dist/cjs/datocms/index.d.ts"],
+      "next": ["./dist/cjs/next/index.d.ts"]
+    }
+  },
+  "engines": {
+    "node": ">=20.9.0"
+  },
   "scripts": {
     "clean": "rimraf dist",
     "prebuild": "npm run clean",
-    "build": "tsc -p tsconfig.build.json",
+    "build:esm": "tsc -p tsconfig.esm.json",
+    "build:cjs": "tsc -p tsconfig.cjs.json && node scripts/write-cjs-package.mjs",
+    "build": "npm run build:esm && npm run build:cjs",
     "lint": "eslint src",
-    "prettier": "prettier --check src",
-    "test": "vitest run"
+    "prettier": "prettier --check src scripts README.md",
+    "test": "vitest run",
+    "test:exports": "node scripts/verify-packed-package.mjs",
+    "test:exports:layout": "node scripts/verify-packed-package.mjs --layout-only",
+    "test:next-build": "node scripts/verify-next-build.mjs",
+    "verify": "npm run prettier && npm run lint && npm run test && npm run build && npm run test:exports",
+    "verify:release": "npm run prettier && npm run lint && npm run test && npm run build && npm run test:exports:layout"
   },
   "publishConfig": {
     "access": "public"

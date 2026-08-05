@@ -3,7 +3,7 @@ name: Test
 on:
   pull_request:
     branches:
-      - "**"
+      - '**'
 
 concurrency:
   group: tests-${{ github.ref }}
@@ -21,8 +21,104 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 24
+          cache: npm
       - run: npm ci
       - run: npm run prettier
       - run: npm run lint
       - run: npm run test
       - run: npm run build
+      - run: npm run test:exports
+      - name: Pack package for smoke tests
+        run: |
+          mkdir -p artifacts
+          npm pack --silent --pack-destination artifacts
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: packed-package
+          path: artifacts/*.tgz
+          if-no-files-found: error
+
+  package-smoke:
+    name: Package smoke (Node ${{ matrix.node }})
+    needs: test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Node 24 is already covered by the lint/test job's export smoke.
+        node: [20.9.0, 22]
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: ${{ matrix.node }}
+          # Warms ~/.npm from the lockfile so the fixture installs below can run
+          # --prefer-offline instead of hitting the registry for pinned peers.
+          cache: npm
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: packed-package
+          path: artifacts
+      - name: Verify packed package
+        run: |
+          tarball="$(ls artifacts/*.tgz)"
+          node scripts/verify-packed-package.mjs --tarball "$tarball"
+
+  next-build:
+    name: Next build smoke (next@${{ matrix.next }})
+    needs: test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Both ends of the `next` peer range, each built on Turbopack AND webpack.
+        # Node-level resolution checks cannot catch bundler-specific breakage:
+        # fully-specified 'next/headers.js' imports pass under Node and webpack but
+        # make Turbopack miss its react-server aliases, failing the build.
+        next: ['15.5.12', '16.2.12']
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: packed-package
+          path: artifacts
+      - name: Verify Next build
+        run: |
+          tarball="$(ls artifacts/*.tgz)"
+          node scripts/verify-next-build.mjs --tarball "$tarball" --next '${{ matrix.next }}'
+
+  # Single stable context to require in branch protection on main. The jobs above
+  # carry matrix values in their names ("Next build smoke (next@16.2.12)"), so
+  # requiring them directly would break protection every time a matrix value is
+  # bumped: the old context stops reporting and blocks every PR. Require only "CI".
+  #
+  # release.yml deliberately skips the registry-dependent smokes and trusts that
+  # this gate ran on the same content, so keep it required.
+  ci:
+    name: CI
+    if: always()
+    needs: [test, package-smoke, next-build]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Verify all required jobs succeeded
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "dependency results: $RESULTS"
+          for result in $RESULTS; do
+            if [ "$result" != "success" ]; then
+              echo "::error::a required job did not succeed ($RESULTS)"
+              exit 1
+            fi
+          done

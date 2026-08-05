@@ -1,7 +1,6 @@
 {
   "compilerOptions": {
     "declaration": true,
-    "outDir": "./dist/",
     "rootDir": "./src",
     "sourceMap": true,
     "strict": true,
@@ -12,12 +11,19 @@
     "allowJs": true,
     "resolveJsonModule": true,
     "module": "nodenext",
-    "target": "esnext",
+    "target": "ES2022",
+    "lib": ["ES2022"],
     "skipLibCheck": true,
+    "noEmit": true,
     // next ships no package "exports" map, so NodeNext cannot resolve bare
     // subpaths like "next/headers". These paths are local type-check only;
     // emitted JS still imports 'next/headers' etc. and consumers resolve them
     // via their bundler (Next apps use moduleResolution: "bundler").
+    //
+    // Do NOT "fix" this by writing fully-specified 'next/headers.js' imports in
+    // src: Turbopack does not apply its react-server aliases to the .js form,
+    // so server-layer code pulls the client navigation module and `next build`
+    // fails with MODULE_UNPARSABLE on app-router-context.
     "paths": {
       "next/cache": ["./node_modules/next/cache.d.ts"],
       "next/headers": ["./node_modules/next/headers.d.ts"],

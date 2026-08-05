@@ -8,8 +8,21 @@ A collection of general purpose utilities and helpers for web projects.
 npm install @smartive/utils
 ```
 
+Requires **Node.js 20.9+** (breaking change if you are still on older Node). The package ships
+dual ESM and CommonJS builds for every public entry point (`.`, `/http`, `/datocms`, `/next`),
+so both `import` and `require` work:
+
+```typescript
+// ESM
+import { createDatoClient } from '@smartive/utils/datocms';
+
+// CommonJS
+const { createDatoClient } = require('@smartive/utils/datocms');
+```
+
 The root export (`@smartive/utils`) stays dependency-free. Optional peer dependencies are only
-required when you import the corresponding subpath.
+required when you import the corresponding subpath. One caveat applies to `/next` — see
+[`@smartive/utils/next`](#smartiveutilsnext) below.
 
 ## Utilities
 
@@ -85,6 +98,12 @@ Next.js App Router helpers for draft mode, DatoCMS web previews, and cache reval
 ```bash
 npm install next
 ```
+
+**Requires a bundler.** This subpath imports `next/headers`, `next/navigation`, and `next/server`
+as bare specifiers. Next's bundlers (Turbopack and webpack) resolve those, but Node's ESM loader
+cannot, because Next ships no package `exports` map. Inside a Next app — the only place these APIs
+work, since they need a request context — this is transparent. Outside one, `require()` resolves
+but a raw `import` does not.
 
 ```typescript
 // app/api/draft/enable/route.ts
