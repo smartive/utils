@@ -50,13 +50,20 @@ type QueryOptionsBase<TResult, TVariables> = {
 };
 
 /**
+ * Adds `variables` to `TOptions`, required when the GraphQL document has required
+ * variables and optional otherwise.
+ */
+export type WithVariables<TVariables, TOptions> =
+  Record<string, never> extends TVariables ? TOptions & { variables?: TVariables } : TOptions & { variables: TVariables };
+
+/**
  * Makes `variables` required when the GraphQL document has required variables,
  * optional otherwise.
  */
-export type QueryDatoCMSOptions<TResult = unknown, TVariables = unknown> =
-  Record<string, never> extends TVariables
-    ? QueryOptionsBase<TResult, TVariables> & { variables?: TVariables }
-    : QueryOptionsBase<TResult, TVariables> & { variables: TVariables };
+export type QueryDatoCMSOptions<TResult = unknown, TVariables = unknown> = WithVariables<
+  TVariables,
+  QueryOptionsBase<TResult, TVariables>
+>;
 
 export type QueryDatoCMSFunction = <TResult = unknown, TVariables = unknown>(
   options: QueryDatoCMSOptions<TResult, TVariables>,
