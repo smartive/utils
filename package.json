@@ -18,6 +18,18 @@
       "types": "./dist/datocms/index.d.ts",
       "import": "./dist/datocms/index.js"
     },
+    "./datocms/next": {
+      "types": "./dist/datocms/next/index.d.ts",
+      "import": "./dist/datocms/next/index.js"
+    },
+    "./cache-tags": {
+      "types": "./dist/cache-tags/index.d.ts",
+      "import": "./dist/cache-tags/index.js"
+    },
+    "./cache-tags/neon": {
+      "types": "./dist/cache-tags/neon.d.ts",
+      "import": "./dist/cache-tags/neon.js"
+    },
     "./next": {
       "types": "./dist/next/index.d.ts",
       "import": "./dist/next/index.js"
@@ -43,7 +55,9 @@
     "utils",
     "helpers",
     "datocms",
-    "nextjs"
+    "nextjs",
+    "cache-components",
+    "cache-tags"
   ],
   "author": "smartive AG",
   "license": "MIT",
@@ -53,9 +67,13 @@
   },
   "peerDependencies": {
     "@datocms/cda-client": "^0.2.10 || ^0.3.0",
+    "@neondatabase/serverless": "^1.0.0",
     "next": "^15.0.0 || ^16.0.0"
   },
   "peerDependenciesMeta": {
+    "@neondatabase/serverless": {
+      "optional": true
+    },
     "@datocms/cda-client": {
       "optional": true
     },
@@ -70,6 +88,7 @@
   },
   "devDependencies": {
     "@datocms/cda-client": "0.3.0",
+    "@neondatabase/serverless": "1.1.0",
     "@smartive/eslint-config": "7.0.1",
     "@smartive/prettier-config": "3.1.2",
     "@types/node": "24.13.3",
