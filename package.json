@@ -34,7 +34,8 @@
     "build": "tsc -p tsconfig.build.json",
     "lint": "eslint src",
     "prettier": "prettier --check src",
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "publishConfig": {
     "access": "public"
