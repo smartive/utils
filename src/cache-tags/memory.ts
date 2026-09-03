@@ -1,3 +1,4 @@
+import { DEFAULT_ORPHAN_RETENTION_SECONDS } from './retention.js';
 import type { CacheTagStore, CacheTagStoreStats } from './types.js';
 
 export type MemoryCacheTagStoreConfig = {
@@ -9,8 +10,6 @@ export type MemoryCacheTagStoreConfig = {
    */
   failing?: boolean;
 };
-
-const DEFAULT_ORPHAN_RETENTION_SECONDS = 30 * 24 * 60 * 60;
 
 type Row = { queryId: string; cacheTag: string; lastSeenAt: number };
 

@@ -1,5 +1,6 @@
 import { neon } from '@neondatabase/serverless';
 
+import { DEFAULT_ORPHAN_RETENTION_SECONDS } from './retention.js';
 import type { CacheTagStore, CacheTagStoreErrorContext, CacheTagStoreStats } from './types.js';
 
 export type NeonCacheTagStoreConfig = {
@@ -28,7 +29,6 @@ export type NeonCacheTagStoreConfig = {
 
 const DEFAULT_TABLE = 'query_cache_tags';
 const DEFAULT_RETRY_DELAY_MS = 30_000;
-const DEFAULT_ORPHAN_RETENTION_SECONDS = 30 * 24 * 60 * 60;
 
 /**
  * Validates and quotes a PostgreSQL identifier so a caller-supplied table name cannot
@@ -108,6 +108,15 @@ export const createNeonCacheTagStore = ({
   };
 
   const isConfigured = () => getClient() !== undefined;
+
+  /** `timestamptz` arrives as a `Date`, while {@link CacheTagStoreStats} reports ISO strings. */
+  const toIsoString = (value: unknown): string | null => {
+    if (value instanceof Date) {
+      return value.toISOString();
+    }
+
+    return typeof value === 'string' ? value : null;
+  };
 
   /**
    * `neon()`'s `query` is typed as a union across its `fullResults` and `arrayMode`
@@ -234,7 +243,19 @@ export const createNeonCacheTagStore = ({
            FROM ${quotedTable}`,
         );
 
-        return (rows[0] as CacheTagStoreStats | undefined) ?? null;
+        const row = rows[0];
+
+        if (!row) {
+          return null;
+        }
+
+        return {
+          mappings: Number(row.mappings),
+          queries: Number(row.queries),
+          tags: Number(row.tags),
+          oldest: toIsoString(row.oldest),
+          newest: toIsoString(row.newest),
+        };
       }),
   };
 };

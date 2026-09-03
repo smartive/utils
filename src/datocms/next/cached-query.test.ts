@@ -32,11 +32,12 @@ const response = (headers: Record<string, string> = {}) =>
     headers: { 'Content-Type': 'application/json', ...headers },
   });
 
-const taggedFetch = (tags = 'tag-a tag-b') => vi.fn(() => Promise.resolve(response({ 'x-cache-tags': tags })));
+const taggedFetch = (tags = 'tag-a tag-b') => vi.fn<typeof fetch>(() => Promise.resolve(response({ 'x-cache-tags': tags })));
 
-/** `vi.fn()` mock args are `any`; read the recorded decision through a typed view. */
-const decisionAt = (mock: ReturnType<typeof vi.fn>, index = 0): CacheDecision =>
-  mock.mock.calls[index]?.[0] as CacheDecision;
+const requestHeaders = (fetchFn: ReturnType<typeof taggedFetch>): Headers =>
+  new Headers(fetchFn.mock.calls[0]?.[1]?.headers);
+
+const decisionRecorder = () => vi.fn<(decision: CacheDecision) => void>();
 
 describe('createCachedDatoClient', () => {
   beforeEach(() => {
@@ -60,12 +61,12 @@ describe('createCachedDatoClient', () => {
 
   describe('cached path', () => {
     it('tags the entry with the deterministic query ID', async () => {
-      const onCacheDecision = vi.fn();
+      const onCacheDecision = decisionRecorder();
       const query = createCachedDatoClient({ fetchFn: taggedFetch(), store: createMemoryCacheTagStore(), onCacheDecision });
 
       await query({ document });
 
-      const { queryId } = decisionAt(onCacheDecision);
+      const queryId = onCacheDecision.mock.calls[0]?.[0].queryId;
       expect(queryId).toMatch(/^Layout-[0-9a-f]{16}$/);
       expect(cacheTag).toHaveBeenCalledWith(queryId);
     });
@@ -129,8 +130,7 @@ describe('createCachedDatoClient', () => {
       const fetchFn = taggedFetch();
       await createCachedDatoClient({ fetchFn, store: createMemoryCacheTagStore() })({ document });
 
-      const init = fetchFn.mock.calls[0]?.[1] as RequestInit | undefined;
-      expect(new Headers(init?.headers).get('X-Cache-Tags')).toBe('true');
+      expect(requestHeaders(fetchFn).get('X-Cache-Tags')).toBe('true');
     });
   });
 
@@ -159,8 +159,7 @@ describe('createCachedDatoClient', () => {
       const fetchFn = taggedFetch();
       await createCachedDatoClient({ fetchFn, store: createMemoryCacheTagStore() })({ document });
 
-      const init = fetchFn.mock.calls[0]?.[1] as RequestInit | undefined;
-      expect(new Headers(init?.headers).get('X-Include-Drafts')).toBe('true');
+      expect(requestHeaders(fetchFn).get('X-Include-Drafts')).toBe('true');
     });
 
     it('stores nothing', async () => {
@@ -190,12 +189,11 @@ describe('createCachedDatoClient', () => {
       const fetchFn = taggedFetch();
       await createCachedDatoClient({ fetchFn })({ document, includeDrafts: true });
 
-      const init = fetchFn.mock.calls[0]?.[1] as RequestInit | undefined;
-      expect(new Headers(init?.headers).get('X-Include-Drafts')).toBe('true');
+      expect(requestHeaders(fetchFn).get('X-Include-Drafts')).toBe('true');
     });
 
     it('reports the bypass through onCacheDecision', async () => {
-      const onCacheDecision = vi.fn();
+      const onCacheDecision = decisionRecorder();
       await createCachedDatoClient({ fetchFn: taggedFetch(), onCacheDecision })({ document, skipCache: true });
 
       expect(onCacheDecision).toHaveBeenCalledWith(expect.objectContaining({ mode: 'bypass', stored: false }));
@@ -204,8 +202,8 @@ describe('createCachedDatoClient', () => {
 
   describe('registry', () => {
     it('keeps two clients separate', async () => {
-      const first = vi.fn();
-      const second = vi.fn();
+      const first = decisionRecorder();
+      const second = decisionRecorder();
       const queryA = createCachedDatoClient({ id: 'a', fetchFn: taggedFetch(), onCacheDecision: first });
       const queryB = createCachedDatoClient({ id: 'b', fetchFn: taggedFetch(), onCacheDecision: second });
 
@@ -218,7 +216,7 @@ describe('createCachedDatoClient', () => {
 
     it('separates query IDs across DatoCMS environments', async () => {
       const decisions: string[] = [];
-      const record = (decision: { queryId: string }) => decisions.push(decision.queryId);
+      const record = (decision: CacheDecision) => decisions.push(decision.queryId);
 
       process.env.DATOCMS_ENVIRONMENT = 'main';
       await createCachedDatoClient({ id: 'main', fetchFn: taggedFetch(), onCacheDecision: record })({ document });
@@ -230,10 +228,10 @@ describe('createCachedDatoClient', () => {
     });
 
     it('namespaces query IDs with a tag prefix', async () => {
-      const onCacheDecision = vi.fn();
+      const onCacheDecision = decisionRecorder();
       await createCachedDatoClient({ fetchFn: taggedFetch(), tagPrefix: 'flf', onCacheDecision })({ document });
 
-      expect(decisionAt(onCacheDecision).queryId).toMatch(/^flf:Layout-/);
+      expect(onCacheDecision.mock.calls[0]?.[0].queryId).toMatch(/^flf:Layout-/);
     });
 
     it('explains itself when no client is registered', async () => {

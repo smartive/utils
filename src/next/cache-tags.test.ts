@@ -188,6 +188,17 @@ describe('createCacheTagInvalidationHandler', () => {
       expect(spy).toHaveBeenCalledWith(3600);
     });
 
+    // The store owns the retention default, so the handler must not restate it.
+    it('leaves the orphan window to the store by default', async () => {
+      const store = await seededStore();
+      const spy = vi.spyOn(store, 'deleteOrphanedCacheTags');
+      const { POST } = createCacheTagInvalidationHandler({ store });
+
+      await POST(webhookRequest(payload(['tag-z'])));
+
+      expect(spy).toHaveBeenCalledWith(undefined);
+    });
+
     it('skips the orphan sweep when disabled', async () => {
       const { POST } = createCacheTagInvalidationHandler({ store: await seededStore(), orphanRetentionSeconds: false });
 

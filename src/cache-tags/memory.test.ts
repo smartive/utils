@@ -1,18 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { createMemoryCacheTagStore } from './memory.js';
-import type { CacheTagStore } from './types.js';
 
 /**
- * Shared behavioural contract for {@link CacheTagStore} implementations.
- *
- * Exported from this test file, rather than a separate module, so it needs no build or
- * packaging excludes of its own: `*.test.ts` is already excluded from both
- * `tsconfig.build.json` and the published `files`. `neon.test.ts` imports it from here.
- *
- * Pass a factory returning a **fresh, empty, configured** store.
+ * The memory store doubles as the reference implementation of the `CacheTagStore`
+ * contract, so these assertions describe the contract itself, not just this backend.
  */
-export const describeCacheTagStoreContract = (createStore: () => CacheTagStore) => {
+describe('createMemoryCacheTagStore', () => {
+  const createStore = () => createMemoryCacheTagStore();
+
   it('reports itself as configured', () => {
     expect(createStore().isConfigured()).toBe(true);
   });
@@ -96,16 +92,8 @@ export const describeCacheTagStoreContract = (createStore: () => CacheTagStore) 
     await expect(store.queriesReferencingCacheTags(['tag-a'])).resolves.toEqual(['Layout-abc']);
   });
 
-  // Whether a row *past* the window is actually swept depends on the backend's clock
-  // granularity (an in-memory millisecond compare vs a Postgres `now()` per statement),
-  // so each implementation asserts that itself rather than sharing an assertion here.
-};
-
-describe('createMemoryCacheTagStore', () => {
-  describeCacheTagStoreContract(() => createMemoryCacheTagStore());
-
   it('refreshes the last-seen timestamp instead of duplicating a row', async () => {
-    const store = createMemoryCacheTagStore();
+    const store = createStore();
     await store.storeQueryCacheTags('Layout-abc', ['tag-a']);
     await store.storeQueryCacheTags('Layout-abc', ['tag-a']);
 
@@ -116,7 +104,7 @@ describe('createMemoryCacheTagStore', () => {
     vi.useFakeTimers();
 
     try {
-      const store = createMemoryCacheTagStore();
+      const store = createStore();
       await store.storeQueryCacheTags('Layout-abc', ['tag-a']);
 
       vi.advanceTimersByTime(3601 * 1000);
@@ -129,7 +117,7 @@ describe('createMemoryCacheTagStore', () => {
   });
 
   it('reports stats for the stored mappings', async () => {
-    const store = createMemoryCacheTagStore();
+    const store = createStore();
     await store.storeQueryCacheTags('Layout-abc', ['tag-a', 'shared']);
     await store.storeQueryCacheTags('Page-def', ['shared']);
 

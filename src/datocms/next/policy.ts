@@ -37,14 +37,16 @@ export const resolveCacheProfiles = (profiles: Partial<CacheProfiles> = {}): Cac
 });
 
 /**
- * - `bypass` — do not enter a cached scope at all.
+ * How a query was served, as reported to `onCacheDecision`.
+ *
+ * - `bypass` — never entered a cached scope.
  * - `draft` — inside the cached scope, but draft mode is on, so Next re-executes on every
  *   request and writes nothing to the cache.
  * - `cached` — the normal published path.
  */
 export type CacheMode = 'bypass' | 'draft' | 'cached';
 
-export type ResolveCacheModeInput = {
+export type ShouldBypassCacheInput = {
   /**
    * Explicitly requested by the caller, e.g. preview slug resolution. Distinct from draft
    * mode being merely *enabled*: an explicit request bypasses the cache entirely so the
@@ -53,32 +55,28 @@ export type ResolveCacheModeInput = {
   includeDrafts?: boolean;
   /** Explicit per-query cache bypass. */
   skipCache?: boolean;
-  /** `(await draftMode()).isEnabled`, read inside the cached scope. */
-  draftModeEnabled?: boolean;
 };
 
-export const resolveCacheMode = ({ includeDrafts, skipCache, draftModeEnabled }: ResolveCacheModeInput): CacheMode => {
-  if (includeDrafts === true || skipCache === true) {
-    return 'bypass';
-  }
-
-  return draftModeEnabled === true ? 'draft' : 'cached';
-};
+/**
+ * Decided *before* entering a cached scope, since a bypass must not enter one at all.
+ * Draft mode being merely enabled is handled inside the scope instead.
+ */
+export const shouldBypassCache = ({ includeDrafts, skipCache }: ShouldBypassCacheInput): boolean =>
+  includeDrafts === true || skipCache === true;
 
 export type ResolveCacheProfileInput = {
-  mode: Exclude<CacheMode, 'bypass'>;
   /** Whether `storeQueryCacheTags` reported the mapping as durable. */
   stored: boolean;
   profiles: CacheProfiles;
-  /** Per-query override. Only honoured on the fully cached path. */
+  /** Per-query override. */
   override?: CacheLifeProfile;
 };
 
-export const resolveCacheProfile = ({ mode, stored, profiles, override }: ResolveCacheProfileInput): CacheLifeProfile => {
-  if (mode === 'draft') {
-    return profiles.draft;
-  }
-
+/**
+ * Picks the `cacheLife` profile for the published path. The draft path always uses
+ * `profiles.draft`, since nothing is written to the cache there.
+ */
+export const resolveCacheProfile = ({ stored, profiles, override }: ResolveCacheProfileInput): CacheLifeProfile => {
   // An override must not be able to extend the lifetime of an entry the webhook cannot
   // reach — that would strand stale content until the override expires.
   if (!stored) {

@@ -97,9 +97,9 @@ npm install @datocms/cda-client @neondatabase/serverless
 import { createNeonCacheTagStore } from '@smartive/utils/cache-tags/neon';
 import { createCachedDatoClient } from '@smartive/utils/datocms/next';
 
-export const queryDatoCMS = createCachedDatoClient({
-  store: createNeonCacheTagStore(),
-});
+export const store = createNeonCacheTagStore();
+
+export const queryDatoCMS = createCachedDatoClient({ store });
 ```
 
 ```typescript

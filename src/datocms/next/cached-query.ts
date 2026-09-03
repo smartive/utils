@@ -7,9 +7,9 @@ import { resolveEnvironment } from '../config.js';
 import { performQuery } from '../raw.js';
 import type { DatoClientConfig, TypedDocumentNode, WithVariables } from '../types.js';
 import {
-  resolveCacheMode,
   resolveCacheProfile,
   resolveCacheProfiles,
+  shouldBypassCache,
   type CacheLifeProfile,
   type CacheProfiles,
 } from './policy.js';
@@ -96,7 +96,7 @@ const performCachedQuery = async <TResult, TVariables>(
   // A bypass never reaches this function — it is decided before entering the cached scope —
   // so the mode here is binary.
   if (draftModeEnabled) {
-    const profile = resolveCacheProfile({ mode: 'draft', stored: false, profiles });
+    const profile = profiles.draft;
     cacheLife(profile);
 
     const { data } = await performQuery({ document, variables, includeDrafts: true }, datoConfig);
@@ -114,7 +114,7 @@ const performCachedQuery = async <TResult, TVariables>(
   // until its TTL expires or invalidate-all runs. Persisting before choosing the profile
   // keeps the window as small as possible.
   const stored = (await store?.storeQueryCacheTags(queryId, cacheTags)) ?? false;
-  const profile = resolveCacheProfile({ mode: 'cached', stored, profiles, override: cacheProfile });
+  const profile = resolveCacheProfile({ stored, profiles, override: cacheProfile });
 
   cacheLife(profile);
 
@@ -147,13 +147,10 @@ export const createCachedDatoClient = (config: CachedDatoClientConfig = {}): Cac
   return async function queryDatoCMS<TResult = unknown, TVariables = unknown>(
     options: CachedQueryDatoCMSOptions<TResult, TVariables>,
   ): Promise<TResult> {
-    const { document, variables, includeDrafts, skipCache, cacheProfile } = options as CachedQueryOptionsBase<
-      TResult,
-      TVariables
-    > & { variables?: TVariables };
+    const { document, variables, includeDrafts, skipCache, cacheProfile } = options;
 
     // Resolved outside the cached scope: a bypass must not enter one at all.
-    if (resolveCacheMode({ includeDrafts, skipCache }) === 'bypass') {
+    if (shouldBypassCache({ includeDrafts, skipCache })) {
       const { data } = await performQuery({ document, variables, includeDrafts: includeDrafts === true }, datoConfig);
 
       onCacheDecision?.({

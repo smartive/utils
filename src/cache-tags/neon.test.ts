@@ -157,7 +157,39 @@ describe('createNeonCacheTagStore', () => {
     it('reports stats', async () => {
       query.mockResolvedValue(rows([{ mappings: 3, queries: 2, tags: 2, oldest: null, newest: null }]));
 
-      expect(await createNeonCacheTagStore().stats?.()).toMatchObject({ mappings: 3, queries: 2 });
+      expect(await createNeonCacheTagStore().stats?.()).toEqual({
+        mappings: 3,
+        queries: 2,
+        tags: 2,
+        oldest: null,
+        newest: null,
+      });
+    });
+
+    // `timestamptz` arrives as a `Date`, but the contract reports ISO strings.
+    it('normalizes stats timestamps to ISO strings', async () => {
+      query.mockResolvedValue(
+        rows([
+          {
+            mappings: 1,
+            queries: 1,
+            tags: 1,
+            oldest: new Date('2026-01-02T03:04:05.000Z'),
+            newest: new Date('2026-02-03T04:05:06.000Z'),
+          },
+        ]),
+      );
+
+      expect(await createNeonCacheTagStore().stats?.()).toMatchObject({
+        oldest: '2026-01-02T03:04:05.000Z',
+        newest: '2026-02-03T04:05:06.000Z',
+      });
+    });
+
+    it('reports no stats for an empty result', async () => {
+      query.mockResolvedValue(rows([]));
+
+      expect(await createNeonCacheTagStore().stats?.()).toBeNull();
     });
   });
 

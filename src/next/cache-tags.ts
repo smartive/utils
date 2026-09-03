@@ -1,12 +1,10 @@
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { after, type NextRequest, NextResponse } from 'next/server';
 
-import { isCacheTagsInvalidateWebhook } from '../cache-tags/webhook.js';
 import type { CacheTagStore } from '../cache-tags/types.js';
+import { isCacheTagsInvalidateWebhook } from '../cache-tags/webhook.js';
 import { withCORS } from '../http/cors.js';
 import { isValidToken } from '../http/tokens.js';
-
-const DEFAULT_ORPHAN_RETENTION_SECONDS = 30 * 24 * 60 * 60;
 
 export type CacheTagInvalidationResult = {
   store: string;
@@ -23,7 +21,7 @@ export type CacheTagInvalidationHandlerConfig = {
   secret?: string;
   /**
    * Retention for the orphan sweep run via `after()` on each successful invalidation.
-   * `false` disables the sweep. Default 30 days.
+   * `false` disables the sweep. Defaults to the store's own retention.
    */
   orphanRetentionSeconds?: number | false;
   /** Called with the result of a successful invalidation. Defaults to `console.info`. */
@@ -33,6 +31,8 @@ export type CacheTagInvalidationHandlerConfig = {
 };
 
 const preflight = () => new NextResponse(null, withCORS({ status: 204 }));
+
+const unauthorized = (error = 'Invalid Token') => NextResponse.json({ error }, withCORS({ status: 401 }));
 
 /**
  * Handlers for the DatoCMS `cda_cache_tags` invalidation webhook.
@@ -52,7 +52,7 @@ const preflight = () => new NextResponse(null, withCORS({ status: 204 }));
 export function createCacheTagInvalidationHandler({
   store,
   secret,
-  orphanRetentionSeconds = DEFAULT_ORPHAN_RETENTION_SECONDS,
+  orphanRetentionSeconds,
   onInvalidate = (result) => console.info('[cache-tags] invalidate', result),
   diagnostics,
 }: CacheTagInvalidationHandlerConfig) {
@@ -60,10 +60,7 @@ export function createCacheTagInvalidationHandler({
 
   const POST = async (request: NextRequest): Promise<NextResponse> => {
     if (!isValidToken(request.headers.get('Webhook-Token'), getSecret())) {
-      return NextResponse.json(
-        { error: 'You need to provide a secret token in the `Webhook-Token` header for this endpoint.' },
-        withCORS({ status: 401 }),
-      );
+      return unauthorized('You need to provide a secret token in the `Webhook-Token` header for this endpoint.');
     }
 
     // 503 rather than a 200 no-op, so DatoCMS retries instead of recording a successful
@@ -87,13 +84,13 @@ export function createCacheTagInvalidationHandler({
       return NextResponse.json({ error: 'Expected a `cda_cache_tags` invalidation payload.' }, withCORS({ status: 400 }));
     }
 
-    const startedAt = Date.now();
     const cacheTags = payload.entity.attributes.tags;
 
     if (cacheTags.length === 0) {
       return NextResponse.json({ error: 'Expected at least one cache tag.' }, withCORS({ status: 400 }));
     }
 
+    const startedAt = Date.now();
     const queryIds = await store.queriesReferencingCacheTags(cacheTags);
 
     // `null` means the lookup failed, which is not the same as nothing matching: retrying
@@ -129,7 +126,7 @@ export function createCacheTagInvalidationHandler({
 
   const GET = async (request: NextRequest): Promise<NextResponse> => {
     if (!isValidToken(new URL(request.url).searchParams.get('token'), getSecret())) {
-      return NextResponse.json({ error: 'Invalid Token' }, withCORS({ status: 401 }));
+      return unauthorized();
     }
 
     return NextResponse.json(
@@ -188,7 +185,7 @@ export function createCacheTagInvalidateAllHandler({ store, secret, paths = [] }
 
   const GET = async (request: NextRequest): Promise<NextResponse> => {
     if (!isValidToken(new URL(request.url).searchParams.get('token'), getSecret())) {
-      return NextResponse.json({ error: 'Invalid Token' }, withCORS({ status: 401 }));
+      return unauthorized();
     }
 
     return invalidateAll();
@@ -196,7 +193,7 @@ export function createCacheTagInvalidateAllHandler({ store, secret, paths = [] }
 
   const POST = async (request: NextRequest): Promise<NextResponse> => {
     if (!isValidToken(request.headers.get('Webhook-Token'), getSecret())) {
-      return NextResponse.json({ error: 'Invalid Token' }, withCORS({ status: 401 }));
+      return unauthorized();
     }
 
     return invalidateAll();

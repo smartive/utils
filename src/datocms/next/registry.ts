@@ -1,10 +1,11 @@
 import type { CacheTagStore } from '../../cache-tags/types.js';
 import type { DatoClientConfig } from '../types.js';
-import type { CacheLifeProfile, CacheProfiles } from './policy.js';
+import type { CacheLifeProfile, CacheMode, CacheProfiles } from './policy.js';
 
 export type CacheDecision = {
   queryId: string;
-  mode: 'bypass' | 'draft' | 'cached';
+  mode: CacheMode;
+  /** Absent on the `bypass` path, which sets no `cacheLife`. */
   profile?: CacheLifeProfile;
   cacheTagCount: number;
   stored: boolean;
