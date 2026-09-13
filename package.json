@@ -92,7 +92,7 @@
     "@neondatabase/serverless": "1.1.0",
     "@smartive/eslint-config": "7.0.2",
     "@smartive/prettier-config": "3.1.2",
-    "@types/node": "24.13.3",
+    "@types/node": "24.13.4",
     "eslint": "9.39.5",
     "eslint-import-resolver-typescript": "4.4.5",
     "next": "16.3.4",
