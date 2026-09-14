@@ -95,7 +95,7 @@
     "@types/node": "24.13.4",
     "eslint": "9.39.5",
     "eslint-import-resolver-typescript": "4.4.5",
-    "next": "16.3.4",
+    "next": "16.3.5",
     "prettier": "3.9.6",
     "react": "19.3.0",
     "react-dom": "19.3.0",
