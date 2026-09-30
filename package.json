@@ -90,10 +90,10 @@
   "devDependencies": {
     "@datocms/cda-client": "0.3.0",
     "@neondatabase/serverless": "1.1.0",
-    "@smartive/eslint-config": "7.0.3",
+    "@smartive/eslint-config": "9.0.5",
     "@smartive/prettier-config": "3.1.2",
     "@types/node": "24.19.0",
-    "eslint": "9.39.5",
+    "eslint": "10.11.0",
     "eslint-import-resolver-typescript": "4.4.5",
     "next": "16.3.6",
     "prettier": "3.9.9",
