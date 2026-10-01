@@ -85,7 +85,7 @@
   "overrides": {
     "brace-expansion": "5.0.12",
     "postcss": "8.5.28",
-    "sharp": "0.35.4"
+    "sharp": "0.35.5"
   },
   "devDependencies": {
     "@datocms/cda-client": "0.3.2",
