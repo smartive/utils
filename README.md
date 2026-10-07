@@ -78,6 +78,10 @@ const query = createDatoClient({
 
 Config passed to `createDatoClient` always wins over environment variables.
 
+On HTTP 429 a query waits for `X-RateLimit-Reset` (plus a few seconds of jitter) and retries up to
+`maxRetries` times (default `3`) before rethrowing the cda-client `ApiError`. Set `autoRetry: false`
+to fail immediately. cda-client's own unbounded retry is always disabled.
+
 ## `@smartive/utils/datocms/next`
 
 The same client, backed by [Next.js Cache Components](https://nextjs.org/docs/app/api-reference/config/next-config-js/cacheComponents)

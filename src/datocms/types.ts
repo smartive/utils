@@ -32,8 +32,10 @@ export type DatoClientConfig = {
   endpoint?: string;
   /** Filter out invalid records. Defaults to `true`. */
   excludeInvalid?: boolean;
-  /** Auto-retry on 429. Defaults to `true` (cda-client default). */
+  /** Retry on 429, waiting for `X-RateLimit-Reset` (plus jitter). Defaults to `true`. */
   autoRetry?: boolean;
+  /** Maximum 429 retries per query when `autoRetry` is on. Defaults to `3`. */
+  maxRetries?: number;
   /** Published revalidate TTL in seconds. Defaults to 86400 (24 hours). */
   revalidate?: number;
   /** Custom fetch implementation (useful for tests). */

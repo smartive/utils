@@ -126,7 +126,7 @@ describe('performQuery', () => {
     expect(getRequestHeaders(fetchFn, 1).get('X-Base-Editing-Url')).toBe('https://project.admin.datocms.com');
   });
 
-  it('preserves cda-client auto-retry behaviour', async () => {
+  it('retries 429s by default', async () => {
     const fetchFn = vi
       .fn<typeof fetch>()
       .mockResolvedValueOnce(jsonResponse(429, {}, { 'X-RateLimit-Reset': '0' }))
@@ -135,6 +135,15 @@ describe('performQuery', () => {
     await expect(performQuery({ document, includeDrafts: false }, { apiToken: 'token', fetchFn })).resolves.toMatchObject({
       data: { ok: true },
     });
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+  });
+
+  it('stops retrying 429s after maxRetries', async () => {
+    const fetchFn = vi.fn<typeof fetch>(() => Promise.resolve(jsonResponse(429, {}, { 'X-RateLimit-Reset': '0' })));
+
+    await expect(
+      performQuery({ document, includeDrafts: false }, { apiToken: 'token', fetchFn, maxRetries: 1 }),
+    ).rejects.toThrow('429');
     expect(fetchFn).toHaveBeenCalledTimes(2);
   });
 });

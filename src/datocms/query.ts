@@ -1,6 +1,7 @@
 import { executeQuery, type ExecuteQueryOptions } from '@datocms/cda-client';
 
 import { resolveApiToken, resolveBaseEditingUrl, resolveEnvironment } from './config.js';
+import { withRateLimitRetry } from './retry.js';
 import type { DatoClientConfig, QueryDatoCMSFunction, QueryDatoCMSOptions, TypedDocumentNode } from './types.js';
 
 const PRODUCTION_REVALIDATE_SECONDS = 24 * 60 * 60;
@@ -31,7 +32,7 @@ const getFetchCacheOptions = (
  * Creates a typed `queryDatoCMS` function backed by `@datocms/cda-client`.
  */
 export function createDatoClient(config: DatoClientConfig = {}): QueryDatoCMSFunction {
-  const { excludeInvalid = true, autoRetry, contentLink = 'v1', endpoint, fetchFn } = config;
+  const { excludeInvalid = true, contentLink = 'v1', endpoint, fetchFn } = config;
 
   return async function queryDatoCMS<TResult = unknown, TVariables = unknown>(
     options: QueryDatoCMSOptions<TResult, TVariables>,
@@ -45,18 +46,25 @@ export function createDatoClient(config: DatoClientConfig = {}): QueryDatoCMSFun
       next: { revalidate },
     };
 
-    return executeTypedQuery(document, {
-      token: resolveApiToken(config),
-      variables,
-      includeDrafts,
-      excludeInvalid,
-      environment,
-      ...(autoRetry === undefined ? {} : { autoRetry }),
-      ...(endpoint ? { graphqlEndpointUrl: endpoint } : {}),
-      ...(fetchFn ? { fetchFn } : {}),
-      ...(baseEditingUrl ? { contentLink, baseEditingUrl } : {}),
-      requestInitOptions,
-    });
+    const token = resolveApiToken(config);
+
+    return withRateLimitRetry(
+      () =>
+        executeTypedQuery(document, {
+          token,
+          variables,
+          includeDrafts,
+          excludeInvalid,
+          environment,
+          // Retries are bounded by `withRateLimitRetry`; cda-client's own retry never gives up.
+          autoRetry: false,
+          ...(endpoint ? { graphqlEndpointUrl: endpoint } : {}),
+          ...(fetchFn ? { fetchFn } : {}),
+          ...(baseEditingUrl ? { contentLink, baseEditingUrl } : {}),
+          requestInitOptions,
+        }),
+      config,
+    );
   };
 }
 
