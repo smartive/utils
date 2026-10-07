@@ -26,15 +26,28 @@ const getResetSeconds = (error: ApiError, attempt: number): number => {
 const withJitter = (seconds: number): number => seconds + Math.random() * Math.min(seconds, JITTER_CAP_SECONDS);
 
 /**
+ * `NaN` or `Infinity` would never fail the `attempt > retries` check and bring back the
+ * unbounded retry, so anything non-finite (e.g. an unset env var through `Number()`) gets
+ * the default.
+ */
+const resolveRetries = ({ autoRetry = true, maxRetries }: Pick<DatoClientConfig, 'autoRetry' | 'maxRetries'>): number => {
+  if (!autoRetry) {
+    return 0;
+  }
+
+  return maxRetries !== undefined && Number.isFinite(maxRetries) ? Math.max(0, Math.floor(maxRetries)) : DEFAULT_MAX_RETRIES;
+};
+
+/**
  * Runs a cda-client request (with its own `autoRetry` disabled) and retries 429s a
  * bounded number of times. cda-client's own retry recurses until DatoCMS recovers, so
  * under sustained rate limiting a render or form submission would never settle.
  */
 export const withRateLimitRetry = async <T>(
   request: () => Promise<T>,
-  { autoRetry = true, maxRetries = DEFAULT_MAX_RETRIES }: Pick<DatoClientConfig, 'autoRetry' | 'maxRetries'>,
+  config: Pick<DatoClientConfig, 'autoRetry' | 'maxRetries'>,
 ): Promise<T> => {
-  const retries = autoRetry ? maxRetries : 0;
+  const retries = resolveRetries(config);
 
   for (let attempt = 1; ; attempt++) {
     try {

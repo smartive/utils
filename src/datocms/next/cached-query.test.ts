@@ -126,6 +126,27 @@ describe('createCachedDatoClient', () => {
       expect(cacheLife).toHaveBeenCalledWith('hours');
     });
 
+    it('caches the response that follows a retried 429', async () => {
+      const fetchFn = vi
+        .fn<typeof fetch>()
+        .mockResolvedValueOnce(
+          new Response('{}', {
+            status: 429,
+            headers: { 'Content-Type': 'application/json', 'X-RateLimit-Reset': '0' },
+          }),
+        )
+        .mockResolvedValueOnce(response({ 'x-cache-tags': 'tag-a tag-b' }));
+      const onCacheDecision = decisionRecorder();
+      const query = createCachedDatoClient({ fetchFn, store: createMemoryCacheTagStore(), onCacheDecision });
+
+      await expect(query({ document })).resolves.toEqual({ ok: true });
+
+      expect(fetchFn).toHaveBeenCalledTimes(2);
+      expect(onCacheDecision).toHaveBeenCalledWith(
+        expect.objectContaining({ mode: 'cached', profile: 'days', cacheTagCount: 2, stored: true }),
+      );
+    });
+
     it('requests cache tags from DatoCMS', async () => {
       const fetchFn = taggedFetch();
       await createCachedDatoClient({ fetchFn, store: createMemoryCacheTagStore() })({ document });

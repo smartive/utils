@@ -34,7 +34,10 @@ export type DatoClientConfig = {
   excludeInvalid?: boolean;
   /** Retry on 429, waiting for `X-RateLimit-Reset` (plus jitter). Defaults to `true`. */
   autoRetry?: boolean;
-  /** Maximum 429 retries per query when `autoRetry` is on. Defaults to `3`. */
+  /**
+   * Maximum 429 retries per query when `autoRetry` is on. Defaults to `3`, which also
+   * applies to non-finite values; negatives mean no retries.
+   */
   maxRetries?: number;
   /** Published revalidate TTL in seconds. Defaults to 86400 (24 hours). */
   revalidate?: number;

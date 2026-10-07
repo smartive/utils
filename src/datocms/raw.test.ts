@@ -138,6 +138,23 @@ describe('performQuery', () => {
     expect(fetchFn).toHaveBeenCalledTimes(2);
   });
 
+  it('sends the same request options on a retry', async () => {
+    process.env.NEXT_DATOCMS_BASE_EDITING_URL = 'https://project.admin.datocms.com';
+    const fetchFn = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse(429, {}, { 'X-RateLimit-Reset': '0' }))
+      .mockResolvedValueOnce(jsonResponse(200, { data: { ok: true } }));
+
+    await performQuery({ document, includeDrafts: true }, { apiToken: 'token', environment: 'sandbox', fetchFn });
+
+    const retried = getRequestHeaders(fetchFn, 1);
+    expect(retried.get('Authorization')).toBe('Bearer token');
+    expect(retried.get('X-Environment')).toBe('sandbox');
+    expect(retried.get('X-Include-Drafts')).toBe('true');
+    expect(retried.get('X-Visual-Editing')).toBe('v1');
+    expect(retried.get('X-Base-Editing-Url')).toBe('https://project.admin.datocms.com');
+  });
+
   it('stops retrying 429s after maxRetries', async () => {
     const fetchFn = vi.fn<typeof fetch>(() => Promise.resolve(jsonResponse(429, {}, { 'X-RateLimit-Reset': '0' })));
 
