@@ -137,7 +137,7 @@ describe('createDatoClient / queryDatoCMS', () => {
     );
   });
 
-  it('preserves cda-client auto-retry defaults', async () => {
+  it('retries 429s by default', async () => {
     const fetchFn = vi
       .fn()
       .mockResolvedValueOnce(jsonResponse(429, {}, { 'X-RateLimit-Reset': '0' }))
@@ -145,6 +145,14 @@ describe('createDatoClient / queryDatoCMS', () => {
     const queryDatoCMS = createDatoClient({ apiToken: 'token', fetchFn });
 
     await expect(queryDatoCMS({ document })).resolves.toEqual({ ok: true });
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+  });
+
+  it('stops retrying 429s after maxRetries', async () => {
+    const fetchFn = vi.fn().mockImplementation(() => Promise.resolve(jsonResponse(429, {}, { 'X-RateLimit-Reset': '0' })));
+    const queryDatoCMS = createDatoClient({ apiToken: 'token', fetchFn, maxRetries: 1 });
+
+    await expect(queryDatoCMS({ document })).rejects.toThrow('429');
     expect(fetchFn).toHaveBeenCalledTimes(2);
   });
 
