@@ -2,6 +2,7 @@ import { rawExecuteQuery, type ExecuteQueryOptions } from '@datocms/cda-client';
 
 import { parseXCacheTagsResponseHeader } from '../cache-tags/header.js';
 import { resolveApiToken, resolveBaseEditingUrl, resolveEnvironment } from './config.js';
+import { withRateLimitRetry } from './retry.js';
 import type { DatoClientConfig, TypedDocumentNode } from './types.js';
 
 type RawExecuteTypedQuery = <TResult, TVariables>(
@@ -39,24 +40,32 @@ export const performQuery = async <TResult, TVariables>(
   { document, variables, includeDrafts }: PerformQueryOptions<TResult, TVariables>,
   config: DatoClientConfig,
 ): Promise<PerformQueryResult<TResult>> => {
-  const { excludeInvalid = true, autoRetry, contentLink = 'v1', endpoint, fetchFn } = config;
+  const { excludeInvalid = true, contentLink = 'v1', endpoint, fetchFn } = config;
   const baseEditingUrl = includeDrafts ? resolveBaseEditingUrl(config) : undefined;
 
-  const [data, response] = await rawExecuteTypedQuery(document, {
-    token: resolveApiToken(config),
-    variables,
-    includeDrafts,
-    excludeInvalid,
-    environment: resolveEnvironment(config),
-    // Draft responses carry no cache tags, and asking for them would be a wasted header.
-    returnCacheTags: !includeDrafts,
-    ...(autoRetry === undefined ? {} : { autoRetry }),
-    ...(endpoint ? { graphqlEndpointUrl: endpoint } : {}),
-    ...(fetchFn ? { fetchFn } : {}),
-    ...(baseEditingUrl ? { contentLink, baseEditingUrl } : {}),
-    // No `requestInitOptions`: under Cache Components, `cacheLife` owns the lifetime and a
-    // fetch-level `next.revalidate` would be a second, conflicting source of truth.
-  });
+  const token = resolveApiToken(config);
+  const environment = resolveEnvironment(config);
+
+  const [data, response] = await withRateLimitRetry(
+    () =>
+      rawExecuteTypedQuery(document, {
+        token,
+        variables,
+        includeDrafts,
+        excludeInvalid,
+        environment,
+        // Draft responses carry no cache tags, and asking for them would be a wasted header.
+        returnCacheTags: !includeDrafts,
+        // Retries are bounded by `withRateLimitRetry`; cda-client's own retry never gives up.
+        autoRetry: false,
+        ...(endpoint ? { graphqlEndpointUrl: endpoint } : {}),
+        ...(fetchFn ? { fetchFn } : {}),
+        ...(baseEditingUrl ? { contentLink, baseEditingUrl } : {}),
+        // No `requestInitOptions`: under Cache Components, `cacheLife` owns the lifetime and a
+        // fetch-level `next.revalidate` would be a second, conflicting source of truth.
+      }),
+    config,
+  );
 
   return { data, cacheTags: parseXCacheTagsResponseHeader(response.headers.get('x-cache-tags')) };
 };
