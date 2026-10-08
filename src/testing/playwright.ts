@@ -30,7 +30,10 @@ export type SmokeOptions = {
    * nor send hits from CI.
    */
   allowHosts?: HostPattern[];
-  /** Fail on first-party responses with status >= 400 and failed first-party requests. Default `true`. */
+  /**
+   * Fail on first-party responses with status >= 400 and failed first-party requests. Default `true`.
+   * When `false`, Chromium's matching "Failed to load resource" console errors are skipped too.
+   */
   checkFirstPartyRequests?: boolean;
 };
 
@@ -47,7 +50,11 @@ export type SmokeState = {
 };
 
 export type SmokeFixtures = {
-  /** Override per file or describe block with `test.use({ smokeOptions: { … } })`. */
+  /**
+   * Per file or describe block overrides, e.g. `test.use({ smokeOptions: { failOn: ['error'] } })`.
+   * Merged over the options passed to {@link smokeFixtures}: `ignore` and `allowHosts` add to
+   * them, the other fields replace them.
+   */
   smokeOptions: SmokeOptions;
   smoke: SmokeState;
 };
@@ -103,10 +110,14 @@ const formatIssue = ({ type, text, location }: SmokeIssue): string =>
 export const smokeFixtures = (
   options: SmokeOptions = {},
 ): Fixtures<SmokeFixtures, Record<never, never>, TestArgs, WorkerArgs> => ({
-  smokeOptions: [options, { option: true }],
+  smokeOptions: [{}, { option: true }],
   smoke: [
     async ({ page, baseURL, smokeOptions }, use, testInfo) => {
-      const { ignore = [], failOn = DEFAULT_FAIL_ON, allowHosts = [], checkFirstPartyRequests = true } = smokeOptions;
+      const { failOn = DEFAULT_FAIL_ON, checkFirstPartyRequests = true } = { ...options, ...smokeOptions };
+      // Playwright replaces an option on `test.use()` instead of merging it, which would silently
+      // drop the project-wide allowlist and ignore rules.
+      const ignore = [...(options.ignore ?? []), ...(smokeOptions.ignore ?? [])];
+      const allowHosts = [...(options.allowHosts ?? []), ...(smokeOptions.allowHosts ?? [])];
       const state: SmokeState = { issues: [], blockedUrls: new Set() };
       const seen = new Set<string>();
       let firstPartyOrigin = baseURL ? new URL(baseURL).origin : undefined;
@@ -167,8 +178,9 @@ export const smokeFixtures = (
           return;
         }
 
-        // Chromium logs failed loads too; the response and requestfailed handlers report them with the status.
-        if (checkFirstPartyRequests && text.startsWith('Failed to load resource') && location && isFirstParty(location)) {
+        // Chromium logs failed loads too. The response and requestfailed handlers own first-party
+        // failures (with the status), so `checkFirstPartyRequests: false` silences them entirely.
+        if (text.startsWith('Failed to load resource') && location && isFirstParty(location)) {
           return;
         }
 

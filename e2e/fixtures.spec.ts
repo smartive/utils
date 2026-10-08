@@ -83,6 +83,23 @@ test.describe('stays quiet', () => {
 
       expect(smoke.issues).toEqual([]);
     });
+
+    test('keeps the allowed hosts of the base options', async ({ page, smoke }) => {
+      await gotoAndSettle(page, '/third-party', SETTLE);
+
+      expect(await page.evaluate(() => (window as { allowedLoaded?: boolean }).allowedLoaded)).toBe(true);
+      expect([...smoke.blockedUrls]).toEqual(['http://tracker.invalid/t.js']);
+    });
+  });
+
+  test.describe('without first-party request checks', () => {
+    test.use({ smokeOptions: { checkFirstPartyRequests: false } });
+
+    test('missing first-party assets', async ({ page, smoke }) => {
+      await gotoAndSettle(page, '/missing-asset', SETTLE);
+
+      expect(smoke.issues).toEqual([]);
+    });
   });
 });
 

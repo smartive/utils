@@ -382,7 +382,8 @@ tests:
   skips global setup and lists no routes.
 - **Existing Playwright setup:** `globalSetup` applies to a whole config, so put the smoke suite in
   its own `playwright.smoke.config.ts` and run it with `playwright test -c playwright.smoke.config.ts`.
-- **Per-file options:** `test.use({ smokeOptions: { failOn: ['error'] } })`.
+- **Per-file options:** `test.use({ smokeOptions: { failOn: ['error'] } })`. They are merged over the
+  options passed to `smokeFixtures`: `ignore` and `allowHosts` add to them, the other fields replace them.
 - **Expecting issues:** a test can assert on `smoke.issues` and empty it (`smoke.issues.length = 0`)
   to pass.
 - **CommonJS projects** (most Next.js apps) work: Playwright compiles the specs to `require()`, and

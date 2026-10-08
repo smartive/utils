@@ -57,7 +57,11 @@ const createTestInfo = () => ({ annotations: [] as TestInfo['annotations'], atta
 /** Runs the `smoke` fixture with `body` as the test, returning the outcome of its teardown. */
 const runSmoke = (
   body: (fake: ReturnType<typeof createPage>, state: SmokeState) => Promise<void> | void,
-  { options = {}, baseURL = 'http://localhost:3000' }: { options?: SmokeOptions; baseURL?: string | null } = {},
+  {
+    options = {},
+    overrides = {},
+    baseURL = 'http://localhost:3000',
+  }: { options?: SmokeOptions; overrides?: SmokeOptions; baseURL?: string | null } = {},
 ) => {
   const fake = createPage();
   const testInfo = createTestInfo();
@@ -67,7 +71,7 @@ const runSmoke = (
   let state: SmokeState | undefined;
 
   const result = fixture(
-    { page: fake.page as unknown as Page, baseURL: baseURL ?? undefined, smokeOptions: options },
+    { page: fake.page as unknown as Page, baseURL: baseURL ?? undefined, smokeOptions: overrides },
     async (smokeState) => {
       state = smokeState;
       await body(fake, smokeState);
@@ -79,10 +83,40 @@ const runSmoke = (
 };
 
 describe('smokeFixtures', () => {
-  it('exposes the options as an overridable option fixture', () => {
-    const options = { ignore: ['noise'] };
+  it('exposes an overridable option fixture that starts empty', () => {
+    expect(smokeFixtures({ ignore: ['noise'] }).smokeOptions).toEqual([{}, { option: true }]);
+  });
 
-    expect(smokeFixtures(options).smokeOptions).toEqual([options, { option: true }]);
+  it('adds overridden ignore rules and allowed hosts to the base options', async () => {
+    const { result, getState } = runSmoke(
+      async ({ request, console }) => {
+        expect((await request('https://www.datocms-assets.com/1/a.jpg')).fallback).toHaveBeenCalled();
+        expect((await request('https://stream.mux.com/x/high.mp4')).fallback).toHaveBeenCalled();
+        console('error', 'base noise');
+        console('error', 'file noise');
+        console('error', 'boom');
+      },
+      {
+        options: { allowHosts: ['*.datocms-assets.com'], ignore: ['base noise'] },
+        overrides: { allowHosts: ['stream.mux.com'], ignore: ['file noise'] },
+      },
+    );
+
+    await expect(result).rejects.toThrow('1 issue(s)');
+    expect(getState().issues).toEqual([{ type: 'console-error', text: 'boom', location: undefined }]);
+    expect([...getState().blockedUrls]).toEqual([]);
+  });
+
+  it('lets overrides replace failOn and checkFirstPartyRequests', async () => {
+    const { result } = runSmoke(
+      ({ page, console }) => {
+        console('warning', 'Deprecated thing');
+        page.emit('response', { url: () => 'http://localhost:3000/missing.png', status: () => 404 });
+      },
+      { options: { failOn: ['warning'] }, overrides: { failOn: ['error'], checkFirstPartyRequests: false } },
+    );
+
+    await expect(result).resolves.toBeUndefined();
   });
 
   it('allows first-party, allowlisted and non-http requests and blocks the rest', async () => {
@@ -220,10 +254,15 @@ describe('smokeFixtures', () => {
     ]);
   });
 
-  it('does not check first-party requests when disabled', async () => {
+  it('does not check first-party requests when disabled, including their console errors', async () => {
     const { result } = runSmoke(
-      ({ page }) => {
+      ({ page, console }) => {
         page.emit('response', { url: () => 'http://localhost:3000/missing.png', status: () => 404 });
+        console(
+          'error',
+          'Failed to load resource: the server responded with a status of 404 (Not Found)',
+          'http://localhost:3000/missing.png',
+        );
       },
       { options: { checkFirstPartyRequests: false } },
     );
