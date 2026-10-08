@@ -67,11 +67,12 @@ const DEFAULT_SETTLE_MS = 2000;
 const DEFAULT_ROUTES_FILE = 'node_modules/.cache/smartive-utils/smoke-routes.json';
 
 /**
- * `ERR_BLOCKED_BY_CLIENT` is our own blocking. `ERR_ABORTED` is the browser cancelling a
- * request it no longer needs: `<video>` drops range requests when it switches renditions,
- * and closing the page aborts whatever is still in flight.
+ * The browser cancelling a first-party request it no longer needs: `<video>` drops range
+ * requests when it switches renditions, and navigating or closing the page aborts whatever is
+ * still in flight. Chromium, Firefox, WebKit on macOS and WebKit on Linux each word it differently.
+ * Our own blocking never shows up here, because blocked requests are never first party.
  */
-const EXPECTED_FAILURES = new Set(['net::ERR_BLOCKED_BY_CLIENT', 'net::ERR_ABORTED']);
+const EXPECTED_FAILURES = new Set(['net::ERR_ABORTED', 'NS_BINDING_ABORTED', 'cancelled', 'Load request cancelled']);
 
 const matchesHost = (hostname: string, pattern: HostPattern): boolean => {
   if (typeof pattern !== 'string') {
@@ -174,11 +175,15 @@ export const smokeFixtures = (
         const text = message.text();
         const location = message.location().url || undefined;
 
-        if (location && state.blockedUrls.has(location)) {
+        // Chromium gives the blocked URL as the location, Firefox names it in the text and gives the page.
+        if (
+          (location && state.blockedUrls.has(location)) ||
+          [...state.blockedUrls].some((blockedUrl) => text.includes(blockedUrl))
+        ) {
           return;
         }
 
-        // Chromium logs failed loads too. The response and requestfailed handlers own first-party
+        // Chromium and WebKit log failed loads too. The response and requestfailed handlers own first-party
         // failures (with the status), so `checkFirstPartyRequests: false` silences them entirely.
         if (text.startsWith('Failed to load resource') && location && isFirstParty(location)) {
           return;

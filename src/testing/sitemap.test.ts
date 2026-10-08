@@ -80,7 +80,7 @@ describe('fetchSitemapRoutes', () => {
       );
 
     await expect(fetchSitemapRoutes({ baseURL: 'http://localhost:3000', fetchFn })).resolves.toEqual(['/', '/a']);
-    expect(fetchFn).toHaveBeenCalledWith('http://localhost:3000/sitemap.xml');
+    expect(fetchFn).toHaveBeenCalledWith('http://localhost:3000/sitemap.xml', expect.anything());
   });
 
   it('follows a sitemap index against the base URL host', async () => {
@@ -134,13 +134,36 @@ describe('fetchSitemapRoutes', () => {
         fetchFn,
       }),
     ).resolves.toEqual(['/', '/arbeiten/a', '/arbeiten/b', '/arbeiten/c']);
-    expect(fetchFn).toHaveBeenCalledWith('http://localhost:3000/custom-sitemap.xml');
+    expect(fetchFn).toHaveBeenCalledWith('http://localhost:3000/custom-sitemap.xml', expect.anything());
   });
 
   it('throws on a non-200 sitemap', async () => {
     const fetchFn = vi.fn().mockResolvedValue(xmlResponse('nope', 503));
 
-    await expect(fetchSitemapRoutes({ baseURL: 'http://localhost:3000', fetchFn })).rejects.toThrow('HTTP 503');
+    await expect(fetchSitemapRoutes({ baseURL: 'http://localhost:3000', fetchFn })).rejects.toThrow(
+      'Failed to fetch sitemap http://localhost:3000/sitemap.xml: HTTP 503',
+    );
+  });
+
+  it('times out a hanging sitemap request', async () => {
+    const fetchFn = vi.fn(
+      (_input: RequestInfo | URL, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(init.signal?.reason as Error));
+        }),
+    );
+
+    await expect(fetchSitemapRoutes({ baseURL: 'http://localhost:3000', timeoutMs: 10, fetchFn })).rejects.toThrow(
+      /^\[testing\] Failed to fetch sitemap http:\/\/localhost:3000\/sitemap\.xml: .*timeout/,
+    );
+  });
+
+  it('adds the sitemap URL to network errors', async () => {
+    const fetchFn = vi.fn().mockRejectedValue(new TypeError('fetch failed'));
+
+    await expect(fetchSitemapRoutes({ baseURL: 'http://localhost:3000', fetchFn })).rejects.toThrow(
+      'Failed to fetch sitemap http://localhost:3000/sitemap.xml: fetch failed',
+    );
   });
 
   it('throws when the sitemap lists no pages', async () => {

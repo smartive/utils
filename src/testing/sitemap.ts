@@ -17,10 +17,13 @@ export type FetchSitemapRoutesOptions = {
   limits?: readonly RouteLimit[];
   /** Routes to drop entirely, e.g. pages behind auth or with live webcams. */
   exclude?: readonly Pattern[];
+  /** Per sitemap request. Default 30 seconds, so a hanging sitemap fails the setup instead of stalling it. */
+  timeoutMs?: number;
   fetchFn?: typeof fetch;
 };
 
 const DEFAULT_SITEMAP_PATH = '/sitemap.xml';
+const DEFAULT_TIMEOUT_MS = 30_000;
 /** A sitemap index may only reference sitemaps, so one level is all the spec allows. */
 const MAX_INDEX_DEPTH = 2;
 
@@ -83,9 +86,31 @@ export const fetchSitemapRoutes = async ({
   sitemapPath = DEFAULT_SITEMAP_PATH,
   limits = [],
   exclude = [],
+  timeoutMs = DEFAULT_TIMEOUT_MS,
   fetchFn = fetch,
 }: FetchSitemapRoutesOptions): Promise<string[]> => {
   const visited = new Set<string>();
+
+  const fetchXml = async (url: string): Promise<string> => {
+    try {
+      // The signal also covers reading the body, which is where a slow sitemap spends its time.
+      const response = await fetchFn(url, { signal: AbortSignal.timeout(timeoutMs) });
+
+      if (!response.ok) {
+        await response.body?.cancel();
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      return await response.text();
+    } catch (error) {
+      throw new Error(
+        `[testing] Failed to fetch sitemap ${url}: ${error instanceof Error ? error.message : String(error)}`,
+        {
+          cause: error,
+        },
+      );
+    }
+  };
 
   const collect = async (path: string, depth: number): Promise<string[]> => {
     const url = new URL(path, baseURL).toString();
@@ -96,13 +121,7 @@ export const fetchSitemapRoutes = async ({
 
     visited.add(url);
 
-    const response = await fetchFn(url);
-
-    if (!response.ok) {
-      throw new Error(`[testing] Failed to fetch sitemap ${url}: HTTP ${response.status}`);
-    }
-
-    const { urls, sitemaps } = parseSitemap(await response.text());
+    const { urls, sitemaps } = parseSitemap(await fetchXml(url));
     const nested = await Promise.all(sitemaps.map((sitemap) => collect(toPath(sitemap), depth + 1)));
 
     return [...urls.map(toPath), ...nested.flat()];

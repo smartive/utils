@@ -212,6 +212,19 @@ describe('smokeFixtures', () => {
     await expect(result).resolves.toBeUndefined();
   });
 
+  it('skips Firefox console warnings that name a blocked request', async () => {
+    const { result } = runSmoke(async ({ request, console }) => {
+      await request('https://connect.facebook.net/en_US/fbevents.js');
+      console(
+        'warning',
+        'Loading failed for the <script> with source “https://connect.facebook.net/en_US/fbevents.js”.',
+        'http://localhost:3000/page',
+      );
+    });
+
+    await expect(result).resolves.toBeUndefined();
+  });
+
   it('reports failed first-party responses once, with their status', async () => {
     const { result, getState } = runSmoke(({ page, console }) => {
       page.emit('response', { url: () => 'http://localhost:3000/missing.png', status: () => 404 });
@@ -239,7 +252,10 @@ describe('smokeFixtures', () => {
 
     const { result, getState } = runSmoke(({ page }) => {
       page.emit('requestfailed', failed('http://localhost:3000/video.mp4', 'net::ERR_ABORTED'));
-      page.emit('requestfailed', failed('https://www.googletagmanager.com/gtm.js', 'net::ERR_BLOCKED_BY_CLIENT'));
+      page.emit('requestfailed', failed('http://localhost:3000/firefox.mp4', 'NS_BINDING_ABORTED'));
+      page.emit('requestfailed', failed('http://localhost:3000/webkit-mac.mp4', 'cancelled'));
+      page.emit('requestfailed', failed('http://localhost:3000/webkit-linux.mp4', 'Load request cancelled'));
+      page.emit('requestfailed', failed('https://www.googletagmanager.com/gtm.js', 'net::ERR_BLOCKED_BY_CLIENT.Inspector'));
       page.emit('requestfailed', failed('https://third.example/x.js', 'net::ERR_NAME_NOT_RESOLVED'));
       page.emit('requestfailed', failed('http://localhost:3000/api/data', 'net::ERR_EMPTY_RESPONSE'));
     });
@@ -360,7 +376,7 @@ describe('smokeGlobalSetup', () => {
 
     await smokeGlobalSetup({ file, fetchFn })(config('http://localhost:3333'));
 
-    expect(fetchFn).toHaveBeenCalledWith('http://localhost:3333/sitemap.xml');
+    expect(fetchFn).toHaveBeenCalledWith('http://localhost:3333/sitemap.xml', expect.anything());
     expect(readRoutes(file)).toEqual(['/', '/a']);
   });
 
@@ -369,7 +385,7 @@ describe('smokeGlobalSetup', () => {
 
     await smokeGlobalSetup({ baseURL: 'https://prod.example.com', file: join(dir, 'r.json'), fetchFn })(config());
 
-    expect(fetchFn).toHaveBeenCalledWith('https://prod.example.com/sitemap.xml');
+    expect(fetchFn).toHaveBeenCalledWith('https://prod.example.com/sitemap.xml', expect.anything());
   });
 
   it('throws without a baseURL', async () => {

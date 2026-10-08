@@ -29,7 +29,10 @@ test.describe('collects issues', () => {
   test('unhandled promise rejections', async ({ page, smoke }) => {
     await gotoAndSettle(page, '/rejection', SETTLE);
 
-    expect(smoke.issues).toEqual([expect.objectContaining({ type: 'pageerror', text: 'unhandled rejection' })]);
+    // WebKit prefixes the message with `Error: `.
+    expect(smoke.issues).toEqual([
+      expect.objectContaining({ type: 'pageerror', text: expect.stringContaining('unhandled rejection') }),
+    ]);
     smoke.issues.length = 0;
   });
 

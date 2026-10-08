@@ -247,7 +247,7 @@ const results = await checkUrls(routes, { baseURL: 'http://localhost:3333' });
 
 - `fetchSitemapRoutes` follows a sitemap index and includes `xhtml:link` alternates. It replaces the
   sitemap host with `baseURL`, deduplicates, applies `exclude` then `limits`, and throws when the
-  sitemap is unreachable or empty, so a broken sitemap never turns into a green run that checked
+  sitemap is unreachable, slower than `timeoutMs` (default 30 s) or empty, so a broken sitemap never turns into a green run that checked
   nothing.
 - `checkUrls` requests every URL without following redirects (a redirecting sitemap URL fails),
   retries network errors and 5xx once, and never throws. `formatUrlCheckFailures` turns the
