@@ -102,7 +102,7 @@
   },
   "overrides": {
     "brace-expansion": "5.0.12",
-    "postcss": "8.5.28",
+    "postcss": "8.5.29",
     "sharp": "0.35.5"
   },
   "devDependencies": {
