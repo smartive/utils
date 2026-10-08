@@ -229,6 +229,172 @@ covers the manual full reset (a missed webhook, or a change to the query-ID form
 | `DRAFT_SECRET_TOKEN`              | Authorizes draft enable/disable and web-previews                   |
 | `CACHE_INVALIDATION_SECRET_TOKEN` | Authorizes the revalidate and cache-tag webhooks (`Webhook-Token`) |
 
+## `@smartive/utils/testing`
+
+Building blocks for sitemap-driven smoke tests. Zero dependencies, no browser.
+
+```typescript
+import { checkUrls, fetchSitemapRoutes, formatUrlCheckFailures } from '@smartive/utils/testing';
+
+const routes = await fetchSitemapRoutes({
+  baseURL: 'http://localhost:3333',
+  limits: [{ pattern: '/arbeiten/', max: 3 }], // sample large collections
+  exclude: ['/ueber-uns/livebilder'],
+});
+
+const results = await checkUrls(routes, { baseURL: 'http://localhost:3333' });
+```
+
+- `fetchSitemapRoutes` follows a sitemap index and includes `xhtml:link` alternates. It replaces the
+  sitemap host with `baseURL`, deduplicates, applies `exclude` then `limits`, and throws when the
+  sitemap is unreachable, slower than `timeoutMs` (default 30 s) or empty, so a broken sitemap never turns into a green run that checked
+  nothing.
+- `checkUrls` requests every URL without following redirects (a redirecting sitemap URL fails),
+  retries network errors and 5xx once, and never throws. `formatUrlCheckFailures` turns the
+  failures into an assertion message.
+- `parseSitemap`, `limitRoutes`, `excludeRoutes`, `toPath` and `isIgnored` are exported for custom
+  setups. Patterns are a `string` (substring) or a `RegExp`.
+
+### `@smartive/utils/testing/playwright`
+
+Fixtures that fail a Playwright test on client-side errors: hydration mismatches, React errors,
+exceptions in client components, failed first-party requests. Only types are imported from
+`@playwright/test`, so install the version that matches your CI image:
+
+```bash
+npm install -D @playwright/test@<version of mcr.microsoft.com/playwright in your CI>
+```
+
+The automatic `smoke` fixture:
+
+- blocks every request that is not same-origin with `baseURL` or listed in `allowHosts`, so
+  trackers, consent banners and embeds neither add noise nor send hits from CI
+- collects console errors and warnings (`failOn`), uncaught exceptions and unhandled rejections,
+  first-party responses with status ≥ 400 and failed first-party requests
+- ignores console errors of blocked requests and expected aborts (`<video>` range requests, page
+  close), drops entries matching `ignore`, and deduplicates
+- fails the test afterwards with the full list, attaches it as `smoke-issues.json`, and annotates
+  the blocked hosts
+
+Navigate with `gotoAndSettle`: `waitUntil: 'load'` plus a settle time (default 2 s) for hydration.
+Never `networkidle`, which a playing `<video>` prevents from ever arriving.
+
+#### Recipe
+
+```typescript
+// playwright.config.ts
+import { defineConfig, devices } from '@playwright/test';
+
+const PORT = 3333; // not 3000, so reuseExistingServer never picks up `next dev`
+
+export default defineConfig({
+  testDir: 'test/smoke',
+  globalSetup: './test/smoke/global-setup.ts',
+  fullyParallel: true,
+  workers: process.env.CI ? 2 : undefined,
+  retries: process.env.CI ? 1 : 0,
+  forbidOnly: !!process.env.CI,
+  reporter: [['list'], ['junit', { outputFile: 'test-results/junit.xml' }], ['html', { open: 'never' }]],
+  use: { baseURL: process.env.BASE_URL ?? `http://localhost:${PORT}`, trace: 'retain-on-failure' },
+  projects: [{ name: 'chromium', use: devices['Desktop Chrome'] }],
+  webServer: process.env.BASE_URL
+    ? undefined
+    : {
+        command: `npm run build && npm run start -- -p ${PORT}`,
+        url: `http://localhost:${PORT}/sitemap.xml`,
+        timeout: 15 * 60_000,
+        reuseExistingServer: !process.env.CI,
+      },
+});
+```
+
+```typescript
+// test/smoke/global-setup.ts
+import { smokeGlobalSetup } from '@smartive/utils/testing/playwright';
+
+export default smokeGlobalSetup({ limits: [{ pattern: '/arbeiten/', max: 3 }] });
+```
+
+```typescript
+// test/smoke/fixtures.ts
+import { test as base } from '@playwright/test';
+import { smokeFixtures, type SmokeFixtures } from '@smartive/utils/testing/playwright';
+
+export const test = base.extend<SmokeFixtures>(
+  smokeFixtures({
+    allowHosts: ['*.datocms-assets.com', 'stream.mux.com', 'image.mux.com'],
+    ignore: ['Please ensure that the container has a non-static position'],
+  }),
+);
+export { expect } from '@playwright/test';
+```
+
+```typescript
+// test/smoke/pages.spec.ts
+import { gotoAndSettle, readRoutes } from '@smartive/utils/testing/playwright';
+
+import { expect, test } from './fixtures';
+
+for (const route of readRoutes()) {
+  test(route, async ({ page }) => {
+    const response = await gotoAndSettle(page, route);
+
+    expect(response?.status()).toBe(200);
+  });
+}
+```
+
+```typescript
+// test/smoke/http.spec.ts – plain `test`, so no browser is started
+import { expect, test } from '@playwright/test';
+import { checkUrls, fetchSitemapRoutes, formatUrlCheckFailures } from '@smartive/utils/testing';
+
+test('every sitemap URL returns 200', async ({ baseURL }) => {
+  const results = await checkUrls(await fetchSitemapRoutes({ baseURL: baseURL! }), { baseURL });
+
+  expect(formatUrlCheckFailures(results)).toBe('');
+});
+```
+
+```yaml
+# .gitlab-ci.yml
+tests:
+  image: mcr.microsoft.com/playwright:v<same version as @playwright/test>-noble
+  script:
+    - npm ci
+    - npx playwright test
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  artifacts:
+    when: always
+    expire_in: 1 week
+    reports:
+      junit: test-results/junit.xml
+    paths: [playwright-report/, test-results/]
+```
+
+#### Notes
+
+- **Why global setup:** Playwright runs `webServer` and `globalSetup` before it loads test files,
+  so the spec can generate one test per route from the file `smokeGlobalSetup` writes (default
+  `node_modules/.cache/smartive-utils/smoke-routes.json`). Every worker reads the same list, even
+  if the sitemap changes mid-run. Setup projects run too late for this. `playwright test --list`
+  skips global setup and lists no routes.
+- **Existing Playwright setup:** `globalSetup` applies to a whole config, so put the smoke suite in
+  its own `playwright.smoke.config.ts` and run it with `playwright test -c playwright.smoke.config.ts`.
+- **Per-file options:** `test.use({ smokeOptions: { failOn: ['error'] } })`. They are merged over the
+  options passed to `smokeFixtures`: `ignore` and `allowHosts` add to them, the other fields replace them.
+- **Expecting issues:** a test can assert on `smoke.issues` and empty it (`smoke.issues.length = 0`)
+  to pass.
+- **CommonJS projects** (most Next.js apps) work: Playwright compiles the specs to `require()`, and
+  both subpaths have a `default` export condition for that.
+- **Keep the version in sync:** group `@playwright/test` and `mcr.microsoft.com/playwright` in one
+  Renovate rule, otherwise the browser in the image and the runner drift apart.
+- **Retries** rerun every failure, so an intermittent console error shows up as flaky and passes.
+  Set `failOnFlakyTests: true` to fail on it instead.
+- **Video** is never really played: Playwright's Chromium has no H.264 decoder. Only the page around
+  it is checked.
+
 ## Migrating from `@smartive/datocms-utils`
 
 This package was previously published as `@smartive/datocms-utils`. With `4.0.0` it was renamed to

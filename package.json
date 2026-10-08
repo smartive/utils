@@ -33,6 +33,16 @@
     "./next": {
       "types": "./dist/next/index.d.ts",
       "import": "./dist/next/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "import": "./dist/testing/index.js",
+      "default": "./dist/testing/index.js"
+    },
+    "./testing/playwright": {
+      "types": "./dist/testing/playwright.d.ts",
+      "import": "./dist/testing/playwright.js",
+      "default": "./dist/testing/playwright.js"
     }
   },
   "files": [
@@ -45,9 +55,11 @@
     "prebuild": "npm run clean",
     "build": "tsc -p tsconfig.build.json",
     "lint": "eslint src",
-    "prettier": "prettier --check src",
+    "prettier": "prettier --check src e2e",
     "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "pretest:e2e": "npm run build && tsc -p e2e/tsconfig.json && eslint e2e",
+    "test:e2e": "node e2e/require-check.cts && playwright test -c e2e/playwright.config.ts"
   },
   "publishConfig": {
     "access": "public"
@@ -58,7 +70,9 @@
     "datocms",
     "nextjs",
     "cache-components",
-    "cache-tags"
+    "cache-tags",
+    "playwright",
+    "smoke-test"
   ],
   "author": "smartive AG",
   "license": "MIT",
@@ -69,6 +83,7 @@
   "peerDependencies": {
     "@datocms/cda-client": "^0.2.10 || ^0.3.0",
     "@neondatabase/serverless": "^1.0.0",
+    "@playwright/test": "^1.50.0",
     "next": "^15.0.0 || ^16.0.0"
   },
   "peerDependenciesMeta": {
@@ -80,6 +95,9 @@
     },
     "next": {
       "optional": true
+    },
+    "@playwright/test": {
+      "optional": true
     }
   },
   "overrides": {
@@ -90,6 +108,7 @@
   "devDependencies": {
     "@datocms/cda-client": "0.3.2",
     "@neondatabase/serverless": "1.2.0",
+    "@playwright/test": "1.64.0",
     "@smartive/eslint-config": "10.0.0",
     "@smartive/prettier-config": "3.1.2",
     "@types/node": "24.19.1",

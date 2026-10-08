@@ -1,0 +1,13 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "..",
+    "noEmit": true,
+    "types": ["node"],
+    "allowImportingTsExtensions": true,
+    // No `paths` override: the package's own subpaths resolve to dist like in a consumer project,
+    // so this config is type-checked and linted after the build (see `pretest:e2e`).
+    "paths": {}
+  },
+  "include": ["./**/*"]
+}
