@@ -13,6 +13,7 @@ import type {
 } from '@playwright/test';
 
 import { isIgnored, type IgnoreRule } from './ignore.js';
+import { matchesPattern } from './patterns.js';
 import { fetchSitemapRoutes, type FetchSitemapRoutesOptions } from './sitemap.js';
 
 /** `'example.com'` matches exactly, `'*.example.com'` matches subdomains, a `RegExp` tests the hostname. */
@@ -54,7 +55,7 @@ export type SmokeFixtures = {
 type TestArgs = PlaywrightTestArgs & PlaywrightTestOptions;
 type WorkerArgs = PlaywrightWorkerArgs & PlaywrightWorkerOptions;
 
-const DEFAULT_FAIL_ON: SmokeOptions['failOn'] = ['error', 'warning'];
+const DEFAULT_FAIL_ON: NonNullable<SmokeOptions['failOn']> = ['error', 'warning'];
 const DEFAULT_SETTLE_MS = 2000;
 const DEFAULT_ROUTES_FILE = 'node_modules/.cache/smartive-utils/smoke-routes.json';
 
@@ -67,9 +68,7 @@ const EXPECTED_FAILURES = new Set(['net::ERR_BLOCKED_BY_CLIENT', 'net::ERR_ABORT
 
 const matchesHost = (hostname: string, pattern: HostPattern): boolean => {
   if (typeof pattern !== 'string') {
-    pattern.lastIndex = 0;
-
-    return pattern.test(hostname);
+    return matchesPattern(hostname, pattern);
   }
 
   return pattern.startsWith('*.') ? hostname.endsWith(pattern.slice(1)) : hostname === pattern;
@@ -157,7 +156,7 @@ export const smokeFixtures = (
       page.on('console', (message) => {
         const type = message.type();
 
-        if ((type !== 'error' && type !== 'warning') || !failOn?.includes(type)) {
+        if ((type !== 'error' && type !== 'warning') || !failOn.includes(type)) {
           return;
         }
 

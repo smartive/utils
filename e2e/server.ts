@@ -18,40 +18,42 @@ ${paths.map((path) => `<url><loc>https://prod.example.com${path}</loc></url>`).j
 <url><loc>https://prod.example.com/de</loc><xhtml:link rel="alternate" hreflang="fr" href="https://prod.example.com/fr"/></url>
 </urlset>`;
 
-const routes: Record<string, () => { status?: number; type?: string; body: string }> = {
-  '/sitemap.xml': () => ({
+type Route = { status?: number; type?: string; location?: string; delayMs?: number; body: string };
+
+const routes: Record<string, Route> = {
+  '/sitemap.xml': {
     type: 'application/xml',
     body: `<?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 <sitemap><loc>https://prod.example.com/sitemap-pages.xml</loc></sitemap>
 </sitemapindex>`,
-  }),
-  '/sitemap-pages.xml': () => ({ type: 'application/xml', body: urlset(['/', '/blog/a', '/blog/b', '/blog/c']) }),
-  '/': () => ({ body: page('<h1>Home</h1>') }),
-  '/blog/a': () => ({ body: page('<h1>A</h1>') }),
-  '/blog/b': () => ({ body: page('<h1>B</h1>') }),
-  '/blog/c': () => ({ body: page('<h1>C</h1>') }),
-  '/de': () => ({ body: page('<h1>DE</h1>') }),
-  '/fr': () => ({ body: page('<h1>FR</h1>') }),
-  '/console-error': () => ({ body: page('<script>console.error("client boom")</script>') }),
-  '/console-warning': () => ({ body: page('<script>console.warn("careful")</script>') }),
-  '/page-error': () => ({ body: page('<script>setTimeout(() => { throw new Error("uncaught boom") }, 0)</script>') }),
-  '/rejection': () => ({ body: page('<script>Promise.reject(new Error("unhandled rejection"))</script>') }),
-  '/missing-asset': () => ({ body: page('<img src="/missing.png" alt="">') }),
-  '/third-party': () => ({
+  },
+  '/sitemap-pages.xml': { type: 'application/xml', body: urlset(['/', '/blog/a', '/blog/b', '/blog/c']) },
+  '/': { body: page('<h1>Home</h1>') },
+  '/blog/a': { body: page('<h1>A</h1>') },
+  '/blog/b': { body: page('<h1>B</h1>') },
+  '/blog/c': { body: page('<h1>C</h1>') },
+  '/de': { body: page('<h1>DE</h1>') },
+  '/fr': { body: page('<h1>FR</h1>') },
+  '/console-error': { body: page('<script>console.error("client boom")</script>') },
+  '/console-warning': { body: page('<script>console.warn("careful")</script>') },
+  '/page-error': { body: page('<script>setTimeout(() => { throw new Error("uncaught boom") }, 0)</script>') },
+  '/rejection': { body: page('<script>Promise.reject(new Error("unhandled rejection"))</script>') },
+  '/missing-asset': { body: page('<img src="/missing.png" alt="">') },
+  '/third-party': {
     body: page(
       `<script src="http://tracker.invalid/t.js"></script><script src="http://127.0.0.1:${PORT}/allowed.js"></script>`,
     ),
-  }),
-  '/allowed.js': () => ({ type: 'text/javascript', body: 'window.allowedLoaded = true;' }),
-  '/aborted': () => ({
+  },
+  '/allowed.js': { type: 'text/javascript', body: 'window.allowedLoaded = true;' },
+  '/aborted': {
     body: page(
       '<script>const c = new AbortController(); fetch("/slow", { signal: c.signal }).catch(() => {}); c.abort();</script>',
     ),
-  }),
-  '/slow': () => ({ type: 'text/plain', body: 'slow' }),
-  '/broken-request': () => ({ body: page('<script>fetch("/drop").catch(() => {})</script>') }),
-  '/redirect': () => ({ status: 308, body: '' }),
+  },
+  '/slow': { type: 'text/plain', delayMs: 2000, body: 'slow' },
+  '/broken-request': { body: page('<script>fetch("/drop").catch(() => {})</script>') },
+  '/redirect': { status: 308, location: '/', body: '' },
 };
 
 createServer((request, response) => {
@@ -71,20 +73,10 @@ createServer((request, response) => {
     return;
   }
 
-  const { status = 200, type = 'text/html; charset=utf-8', body } = route();
-  const headers: Record<string, string> = { 'Content-Type': type };
+  const { status = 200, type = 'text/html; charset=utf-8', location, delayMs = 0, body } = route;
+  const headers = { 'Content-Type': type, ...(location && { Location: location }) };
 
-  if (status === 308) {
-    headers.Location = '/';
-  }
-
-  if (pathname === '/slow') {
-    setTimeout(() => response.writeHead(status, headers).end(body), 2000);
-
-    return;
-  }
-
-  response.writeHead(status, headers).end(body);
+  setTimeout(() => response.writeHead(status, headers).end(body), delayMs);
 }).listen(PORT, () => {
   console.info(`fixture server on ${ORIGIN}`);
 });
