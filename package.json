@@ -108,7 +108,7 @@
   "devDependencies": {
     "@datocms/cda-client": "0.3.2",
     "@neondatabase/serverless": "1.2.0",
-    "@playwright/test": "1.64.0",
+    "@playwright/test": "1.64.1",
     "@smartive/eslint-config": "10.0.0",
     "@smartive/prettier-config": "3.1.2",
     "@types/node": "24.19.2",
